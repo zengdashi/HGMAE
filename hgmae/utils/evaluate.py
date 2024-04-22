@@ -11,6 +11,7 @@ from sklearn.metrics.cluster import normalized_mutual_info_score, adjusted_rand_
 
 
 def evaluate_cluster(embeds, y, n_labels, kmeans_random_state):
+    """Evaluate clustering performance using NMI and ARI."""
     Y_pred = KMeans(n_labels, random_state=kmeans_random_state).fit(embeds).predict(embeds)
     nmi = normalized_mutual_info_score(y, Y_pred)
     ari = adjusted_rand_score(y, Y_pred)
@@ -18,6 +19,7 @@ def evaluate_cluster(embeds, y, n_labels, kmeans_random_state):
 
 
 def evaluate(embeds, idx_train, idx_val, idx_test, label, nb_classes, device, lr, wd, isTest=True):
+    """Evaluate the performance of node classification using logistic regression."""
     hid_units = embeds.shape[1]
     xent = nn.CrossEntropyLoss()
 

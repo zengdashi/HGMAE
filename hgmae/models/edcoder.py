@@ -21,20 +21,20 @@ class PreModel(nn.Module):
 
         self.num_metapath = num_metapath
         self.focused_feature_dim = focused_feature_dim
-        self.hidden_dim = args.hidden_dim
-        self.num_layers = args.num_layers
-        self.num_heads = args.num_heads
-        self.num_out_heads = args.num_out_heads
-        self.activation = args.activation
-        self.feat_drop = args.feat_drop
-        self.attn_drop = args.attn_drop
-        self.negative_slope = args.negative_slope
-        self.residual = args.residual
-        self.norm = args.norm
-        self.feat_mask_rate = args.feat_mask_rate
-        self.encoder_type = args.encoder
-        self.decoder_type = args.decoder
-        self.loss_fn = args.loss_fn
+        self.hidden_dim = args.hidden_dim # 512
+        self.num_layers = args.num_layers # 2
+        self.num_heads = args.num_heads # 4
+        self.num_out_heads = args.num_out_heads # 1
+        self.activation = args.activation # prelu
+        self.feat_drop = args.feat_drop # 0.2
+        self.attn_drop = args.attn_drop # 0.1
+        self.negative_slope = args.negative_slope # 0.2
+        self.residual = args.residual # False
+        self.norm = args.norm # None
+        self.feat_mask_rate = args.feat_mask_rate # "0.5,0.005,0.8"
+        self.encoder_type = args.encoder # han
+        self.decoder_type = args.decoder # han
+        self.loss_fn = args.loss_fn # mse
         self.enc_dec_input_dim = self.focused_feature_dim
         assert self.hidden_dim % self.num_heads == 0
         assert self.hidden_dim % self.num_out_heads == 0
@@ -136,6 +136,9 @@ class PreModel(nn.Module):
         return self.hidden_dim
 
     def get_mask_rate(self, input_mask_rate, get_min=False, epoch=None):
+        """
+        Get the mask rate for the current epoch.
+        """
         try:
             return float(input_mask_rate)
         except ValueError:
@@ -200,21 +203,26 @@ class PreModel(nn.Module):
         return loss, loss.item()
 
     def encoding_mask_noise(self, x, mask_rate=0.3):
-        num_nodes = x.shape[0]
-        perm = torch.randperm(num_nodes, device=x.device)
+        """
+        Randomly mask and replace nodes in the input tensor.
+        x: input node
+        mask_rate: the rate of nodes to mask
+        """
+        num_nodes = x.shape[0] # get the number of nodes
+        perm = torch.randperm(num_nodes, device=x.device) # get a random permutation of the nodes
 
         # random masking
-        num_mask_nodes = int(mask_rate * num_nodes)
-        mask_nodes = perm[: num_mask_nodes]
-        keep_nodes = perm[num_mask_nodes:]
+        num_mask_nodes = int(mask_rate * num_nodes) # get the number of nodes to mask
+        mask_nodes = perm[: num_mask_nodes] # get the nodes to mask
+        keep_nodes = perm[num_mask_nodes:] # get the nodes to keep
 
-        perm_mask = torch.randperm(num_mask_nodes, device=x.device)
-        num_leave_nodes = int(self._leave_unchanged * num_mask_nodes)
-        num_noise_nodes = int(self._replace_rate * num_mask_nodes)
-        num_real_mask_nodes = num_mask_nodes - num_leave_nodes - num_noise_nodes
-        token_nodes = mask_nodes[perm_mask[: num_real_mask_nodes]]
-        noise_nodes = mask_nodes[perm_mask[-num_noise_nodes:]]
-        noise_to_be_chosen = torch.randperm(num_nodes, device=x.device)[:num_noise_nodes]
+        perm_mask = torch.randperm(num_mask_nodes, device=x.device) # get a random permutation of the mask nodes
+        num_leave_nodes = int(self._leave_unchanged * num_mask_nodes) # get the number of nodes to leave unchanged
+        num_noise_nodes = int(self._replace_rate * num_mask_nodes) # get the number of nodes to replace
+        num_real_mask_nodes = num_mask_nodes - num_leave_nodes - num_noise_nodes # get the number of nodes to mask
+        token_nodes = mask_nodes[perm_mask[: num_real_mask_nodes]] # get the first num_real_mask_nodes nodes to mask
+        noise_nodes = mask_nodes[perm_mask[-num_noise_nodes:]] # get the nodes to replace by noise
+        noise_to_be_chosen = torch.randperm(num_nodes, device=x.device)[:num_noise_nodes] # get the nodes to replace by noise
 
         out_x = x.clone()
         out_x[token_nodes] = 0.0

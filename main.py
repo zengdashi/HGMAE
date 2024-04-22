@@ -54,7 +54,8 @@ def main(args):
     # model
     focused_feature_dim = feats_dim_list[0]
     model = PreModel(args, num_mp, focused_feature_dim)
-
+    # debuger set trace
+    # import pdb; pdb.set_trace()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.l2_coef)
     # scheduler
     if args.scheduler:
