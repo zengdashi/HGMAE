@@ -22,27 +22,43 @@ def main(args):
     # load data
     (nei_index, feats, mps, pos, label, idx_train, idx_val, idx_test), g, processed_metapaths = \
         load_data(args.dataset, args.ratio, args.type_num)
+    # nei_index: a list of torch.tensor, each tensor is the neighbor index of a node len(nei_index[0]) = len(feats[0])
+    # feats: list of torch.tensor, len(feats) = 2; len(feats[0]) = len(feats[1]) = 4057
+    # mps: a list of torch.tensor, len(mps) = 3; mps[0].coalesce().indices().shape = (2, 11113);
+    #      mps[1].coalesce().indices().shape = (2, 5000495); mps[2].coalesce().indices().shape = (2, 7043571)
+    # pos: torch.tensor, pos.coalesce().indices().shape = (2, 4046685)
+    # label: torch.tensor, label.shape = (4057, 4)
+    # idx_train: list of torch.tens  or, len(idx_train) = 3; len(idx_train[0]) = 80; len(idx_train[1]) = 160; len(idx_train[2]) = 240
+    # idx_val: list of torch.tensor, len(idx_val) = 3; len(idx_val[0]) = 1000; len(idx_val[1]) = 1000; len(idx_val[2]) = 1000
+    # idx_test: list of torch.tensor, len(idx_test) = 3; len(idx_test[0]) = 1000; len(idx_test[1]) = 1000; len(idx_test[2]) = 1000
+    # g: HeteroData(
+    #   (target, relation_0-->, dst_0)={ edge_index=[2, 19645] },
+    #   (dst_0, <--relation_0, target)={ edge_index=[2, 19645] }
+    # )
+    # processed_metapaths: [('target', 'relation_0-->', 'dst_0'), ('dst_0', '<--relation_0', 'target')]
     nb_classes = label.shape[-1]
     feats_dim_list = [i.shape[1] for i in feats]
+
 
     num_mp = int(len(mps))
     print("Dataset: ", args.dataset)
     print("The number of meta-paths: ", num_mp)
 
     if args.use_mp2vec_feat_pred:
+        # metapath2vec was used in default setting
         assert args.mps_embedding_dim > 0
         metapath_model = MetaPath2Vec(g.edge_index_dict,
-                                      args.mps_embedding_dim,
-                                      processed_metapaths,
-                                      args.mps_walk_length,
-                                      args.mps_context_size,
-                                      args.mps_walks_per_node,
-                                      args.mps_num_negative_samples,
+                                      args.mps_embedding_dim,# 64
+                                      processed_metapaths,# [('target', 'relation_0-->', 'dst_0'), ('dst_0', '<--relation_0', 'target')]
+                                      args.mps_walk_length,# 5
+                                      args.mps_context_size,# 3
+                                      args.mps_walks_per_node,# 3
+                                      args.mps_num_negative_samples,# 1
                                       sparse=True
                                       )
         metapath2vec_train(args, metapath_model, args.mps_epoch, args.device)
         mp2vec_feat = metapath_model('target').detach()
-
+        # mp2vec_feat: torch.tensor, mp2vec_feat.shape = (4057, 64)
         # free up memory
         del metapath_model
         if args.device.type == 'cuda':
@@ -64,8 +80,8 @@ def main(args):
     else:
         scheduler = None
 
-    model.to(args.device)
-    feats = [feat.to(args.device) for feat in feats]
+    model.to(args.device)# move model to device
+    feats = [feat.to(args.device) for feat in feats] # move feats to device, most likely cuda
     mps = [mp.to(args.device) for mp in mps]
     label = label.to(args.device)
     idx_train = [i.to(args.device) for i in idx_train]
@@ -100,9 +116,11 @@ def main(args):
             scheduler.step()
 
     print('The best epoch is: ', best_t)
-    model.load_state_dict(best_model_state_dict)
-    model.eval()
-    embeds = model.get_embeds(feats, mps, nei_index)
+    model.load_state_dict(best_model_state_dict) # load the best model state dict
+    model.eval() # set model to evaluation mode
+    embeds = model.get_embeds(feats, mps, nei_index) # embeds: torch.tensor, embeds.shape = (4057, 256)
+    # debuger set trace
+    import pdb; pdb.set_trace()
     if args.task == 'classification':
         macro_score_list, micro_score_list, auc_score_list = [], [], []
         for i in range(len(idx_train)):

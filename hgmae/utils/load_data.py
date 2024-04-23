@@ -72,7 +72,7 @@ def process_data_in_pyg(neigs):
 def load_acm(ratio, type_num):
     # The order of node types: 0 p 1 a 2 s
     path = data_folder + "acm/"
-    label = np.load(path + "labels.npy").astype('int32')
+    label = np.load(path + "labels.npy").astype('int32') # load the labels
     label = encode_onehot(label)
     nei_a = np.load(path + "nei_a.npy", allow_pickle=True)
     nei_s = np.load(path + "nei_s.npy", allow_pickle=True)
